@@ -253,33 +253,54 @@
       };
     }
 
-    form.addEventListener('submit', async (event) => {
+    // 用隐藏 iframe 提交表单，绕过浏览器 CORS 限制
+    const iframe = document.createElement('iframe');
+    iframe.name = 'hiddenFrame';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    function buildFormFields(data, prefix) {
+      prefix = prefix || '';
+      let html = '';
+      for (const key in data) {
+        const name = prefix ? prefix + '[' + key + ']' : key;
+        const val = data[key];
+        if (Array.isArray(val)) {
+          val.forEach(function(v) {
+            html += '<input name="' + name + '[]" value="' + v.replace(/"/g, '&quot;') + '">';
+          });
+        } else if (val && typeof val === 'object') {
+          html += buildFormFields(val, name);
+        } else {
+          html += '<input name="' + name + '" value="' + String(val).replace(/"/g, '&quot;') + '">';
+        }
+      }
+      return html;
+    }
+
+    form.addEventListener('submit', (event) => {
       event.preventDefault();
-      successNotice.classList.remove('visible');
-      successNotice.classList.remove('error');
+      successNotice.classList.remove('visible', 'error');
       if (!validateForm()) return;
 
-      try {
-        const data = collectFormData();
-        const response = await fetch(WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
-        successNotice.classList.remove('error');
-        successNotice.classList.add('visible');
-        form.reset();
-        clearTimeout(successTimer);
-        successTimer = setTimeout(() => successNotice.classList.remove('visible'), 3000);
-      } catch (err) {
-        console.error('提交失败:', err);
-        successNotice.textContent = '提交失败，请稍后重试';
-        successNotice.classList.add('error', 'visible');
-        clearTimeout(successTimer);
-        successTimer = setTimeout(() => successNotice.classList.remove('visible', 'error'), 5000);
-      }
+      const data = collectFormData();
+      const fieldsHtml = buildFormFields(data);
+
+      const iframeDoc = window.frames['hiddenFrame'].document;
+      iframeDoc.open();
+      iframeDoc.write('<!DOCTYPE html><html><body>'
+        + '<form id="n8nForm" action="' + WEBHOOK_URL + '" method="POST">'
+        + fieldsHtml
+        + '</form>'
+        + '<scr' + 'ipt>document.getElementById("n8nForm").submit()</scr' + 'ipt>'
+        + '</body></html>');
+      iframeDoc.close();
+
+      successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
+      successNotice.classList.add('visible');
+      form.reset();
+      clearTimeout(successTimer);
+      successTimer = setTimeout(() => successNotice.classList.remove('visible'), 3000);
     });
 
     // 输入时只清除当前字段的错误（不在打字时对全表单报错）
