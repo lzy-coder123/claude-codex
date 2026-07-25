@@ -1,14 +1,304 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KOL招募报名</title>
+  <style>
+    :root {
+      --primary: #4a90d9;
+      --primary-dark: #357abd;
+      --text: #233044;
+      --muted: #6d7887;
+      --border: #dce4ef;
+      --danger: #d83b42;
+      --success: #197a46;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 48px 20px;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, #e8f0fe 0%, #f3e8ff 100%);
+    }
+    .form-card {
+      width: min(100%, 600px);
+      margin: 0 auto;
+      padding: 38px 42px 40px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 16px 40px rgba(75, 94, 137, 0.16);
+    }
+    .form-header { margin-bottom: 30px; text-align: center; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0.04em; }
+    .form-header p { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+    .form-group, fieldset { margin: 0 0 21px; }
+    fieldset { min-width: 0; padding: 0; border: 0; }
+    label, legend { display: block; margin-bottom: 8px; font-weight: 600; font-size: 15px; }
+    .required { margin-left: 3px; color: var(--danger); }
+    input[type="text"], input[type="tel"], input[type="email"], select, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      outline: none;
+      padding: 12px 13px;
+      color: var(--text);
+      font: inherit;
+      transition: border-color .2s, box-shadow .2s;
+      background: #fff;
+    }
+    textarea { min-height: 112px; resize: vertical; line-height: 1.55; }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(74, 144, 217, .16);
+    }
+    .invalid { border-color: var(--danger) !important; }
+    .option-list { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+    .option-list label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      font-weight: 400;
+      cursor: pointer;
+    }
+    input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); width: 16px; height: 16px; }
+    .error-message { display: none; margin: 7px 0 0; color: var(--danger); font-size: 13px; }
+    .error-message.visible { display: block; }
+    .notice {
+      display: none;
+      margin: 0 0 21px;
+      padding: 12px 14px;
+      border-radius: 9px;
+      color: var(--success);
+      background: #e9f8ef;
+      font-size: 14px;
+    }
+    .notice.visible { display: block; }
+    .notice.error { color: #b71c1c; background: #fdecea; }
+    .button-row { display: flex; gap: 12px; margin-top: 30px; }
+    button {
+      flex: 1;
+      min-height: 46px;
+      border: 0;
+      border-radius: 9px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, transform .2s;
+    }
+    .submit-button { color: #fff; background: var(--primary); }
+    .submit-button:hover { background: var(--primary-dark); }
+    .reset-button { color: #526173; background: #edf1f6; }
+    .reset-button:hover { background: #dde4ec; }
+    button:active { transform: translateY(1px); }
+    @media (max-width: 560px) {
+      body { padding: 24px 14px; }
+      .form-card { padding: 30px 22px; border-radius: 16px; }
+      h1 { font-size: 24px; }
+      .option-list { gap: 10px 12px; }
+    }
+  </style>
+</head>
 <body>
-  <h2>简单测试：直接提交到 n8n</h2>
-  <iframe name="testFrame" style="display:none"></iframe>
-  <form id="f" action="https://lzycoder123.app.n8n.cloud/webhook-test/c5198163-87e5-49cb-bcb2-bb45b5287b23" method="POST" target="testFrame">
-    <input name="name" value="测试张三">
-    <input name="phone" value="13800138000">
-    <button type="submit">提交测试</button>
-  </form>
-  <p>点按钮后，去 n8n 看看有没有收到数据</p>
-</form>
+  <main class="form-card">
+    <header class="form-header">
+      <h1>KOL招募报名</h1>
+      <p>期待与有影响力的创作者一起合作</p>
+    </header>
+
+    <div id="successNotice" class="notice" role="status">报名提交成功，我们会尽快与您联系！</div>
+
+    <!-- 隐藏 iframe，接收表单提交结果，避免页面跳转 -->
+    <iframe name="submitTarget" style="display:none"></iframe>
+
+    <form id="recruitmentForm" novalidate>
+      <div class="form-group">
+        <label for="name">真实姓名<span class="required">*</span></label>
+        <input id="name" name="name" type="text" required />
+        <p class="error-message" id="nameError"></p>
+      </div>
+
+      <div class="form-group">
+        <label for="phone">手机号码<span class="required">*</span></label>
+        <input id="phone" name="phone" type="tel" placeholder="请输入11位中国大陆手机号" required />
+        <p class="error-message" id="phoneError"></p>
+      </div>
+
+      <div class="form-group">
+        <label for="email">电子邮箱<span class="required">*</span></label>
+        <input id="email" name="email" type="email" placeholder="name@example.com" required />
+        <p class="error-message" id="emailError"></p>
+      </div>
+
+      <div class="form-group">
+        <label for="platform">主要平台<span class="required">*</span></label>
+        <select id="platform" name="platform" required>
+          <option value="" selected disabled>请选择主要平台</option>
+          <option>抖音</option><option>B站</option><option>小红书</option><option>微博</option><option>快手</option><option>YouTube</option><option>其他</option>
+        </select>
+        <p class="error-message" id="platformError"></p>
+      </div>
+
+      <div class="form-group">
+        <label for="account">账号名称<span class="required">*</span></label>
+        <input id="account" name="account" type="text" required />
+        <p class="error-message" id="accountError"></p>
+      </div>
+
+      <div class="form-group">
+        <label for="followers">粉丝数量级<span class="required">*</span></label>
+        <select id="followers" name="followers" required>
+          <option value="" selected disabled>请选择粉丝数量级</option>
+          <option>1万以下</option><option>1-10万</option><option>10-50万</option><option>50-100万</option><option>100万以上</option>
+        </select>
+        <p class="error-message" id="followersError"></p>
+      </div>
+
+      <fieldset id="contentFieldset">
+        <legend>内容领域<span class="required">*</span></legend>
+        <div class="option-list">
+          <label><input name="content" type="checkbox" value="美妆护肤" />美妆护肤</label><label><input name="content" type="checkbox" value="科技数码" />科技数码</label><label><input name="content" type="checkbox" value="美食探店" />美食探店</label><label><input name="content" type="checkbox" value="时尚穿搭" />时尚穿搭</label><label><input name="content" type="checkbox" value="母婴育儿" />母婴育儿</label><label><input name="content" type="checkbox" value="运动健身" />运动健身</label><label><input name="content" type="checkbox" value="知识教育" />知识教育</label><label><input name="content" type="checkbox" value="游戏电竞" />游戏电竞</label><label><input name="content" type="checkbox" value="旅游出行" />旅游出行</label><label><input name="content" type="checkbox" value="其他" />其他</label>
+        </div>
+        <p class="error-message" id="contentError"></p>
+      </fieldset>
+
+      <fieldset id="cooperationFieldset">
+        <legend>合作意向<span class="required">*</span></legend>
+        <div class="option-list">
+          <label><input name="cooperation" type="radio" value="产品推广" />产品推广</label><label><input name="cooperation" type="radio" value="品牌代言" />品牌代言</label><label><input name="cooperation" type="radio" value="直播带货" />直播带货</label><label><input name="cooperation" type="radio" value="内容共创" />内容共创</label><label><input name="cooperation" type="radio" value="多种合作" />多种合作</label>
+        </div>
+        <p class="error-message" id="cooperationError"></p>
+      </fieldset>
+
+      <div class="form-group">
+        <label for="introduction">自我介绍/合作经验<span class="required">*</span></label>
+        <textarea id="introduction" name="introduction" required placeholder="请简要介绍您的内容特点、受众及过往合作经验"></textarea>
+        <p class="error-message" id="introductionError"></p>
+      </div>
+
+      <div class="button-row">
+        <button class="submit-button" type="submit">提交报名</button>
+        <button class="reset-button" type="reset">重置</button>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    var WEBHOOK_URL = 'https://lzycoder123.app.n8n.cloud/webhook-test/c5198163-87e5-49cb-bcb2-bb45b5287b23';
+    var form = document.getElementById('recruitmentForm');
+    var successNotice = document.getElementById('successNotice');
+    var phonePattern = /^1[3-9]\d{9}$/;
+    var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function showError(id, message, element) {
+      var errorEl = document.getElementById(id + 'Error');
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.toggle('visible', message !== '');
+      }
+      if (element) {
+        element.classList.toggle('invalid', message !== '');
+      }
+      return message === '';
+    }
+
+    function validateText(id, label) {
+      var el = document.getElementById(id);
+      return showError(id, el.value.trim() ? '' : '请填写' + label, el);
+    }
+
+    function validateForm() {
+      var phone = document.getElementById('phone');
+      var email = document.getElementById('email');
+      var contentChecked = document.querySelectorAll('input[name="content"]:checked').length > 0;
+      var cooperationChecked = document.querySelector('input[name="cooperation"]:checked');
+
+      var checks = [
+        validateText('name', '真实姓名'),
+        showError('phone', !phone.value.trim() ? '请填写手机号码' : phonePattern.test(phone.value.trim()) ? '' : '请输入正确的中国大陆手机号', phone),
+        showError('email', !email.value.trim() ? '请填写电子邮箱' : emailPattern.test(email.value.trim()) ? '' : '请输入正确的邮箱格式', email),
+        validateText('platform', '主要平台'),
+        validateText('account', '账号名称'),
+        validateText('followers', '粉丝数量级'),
+        showError('content', contentChecked ? '' : '请至少选择一个内容领域'),
+        showError('cooperation', cooperationChecked ? '' : '请选择合作意向'),
+        validateText('introduction', '自我介绍/合作经验')
+      ];
+
+      return checks.every(function(v) { return v; });
+    }
+
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      // 隐藏旧提示
+      successNotice.classList.remove('visible', 'error');
+
+      // 校验
+      if (!validateForm()) {
+        return;
+      }
+
+      // 把表单发到 n8n（target 指向隐藏 iframe，页面不跳转）
+      form.action = WEBHOOK_URL;
+      form.target = 'submitTarget';
+      form.submit();
+
+      // 显示成功
+      successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
+      successNotice.classList.add('visible');
+      form.reset();
+
+      // 重置 action/target，方便下次提交
+      form.action = '';
+      form.target = '';
+
+      setTimeout(function() {
+        successNotice.classList.remove('visible');
+      }, 3000);
+    });
+
+    // 输入/修改时清除错误
+    function clearError(el) {
+      var err = document.getElementById(el.id + 'Error');
+      if (err) err.classList.remove('visible');
+      el.classList.remove('invalid');
+    }
+
+    form.addEventListener('input', function(event) {
+      if (event.target.matches('input, textarea, select')) {
+        clearError(event.target);
+      }
+    });
+
+    form.addEventListener('change', function(event) {
+      if (event.target.matches('input, textarea, select')) {
+        clearError(event.target);
+      }
+      if (event.target.name === 'content') {
+        var err = document.getElementById('contentError');
+        if (err) err.classList.remove('visible');
+      }
+      if (event.target.name === 'cooperation') {
+        var err = document.getElementById('cooperationError');
+        if (err) err.classList.remove('visible');
+      }
+    });
+
+    form.addEventListener('reset', function() {
+      successNotice.classList.remove('visible', 'error');
+      var errors = document.querySelectorAll('.error-message');
+      for (var i = 0; i < errors.length; i++) {
+        errors[i].classList.remove('visible');
+      }
+      var invalids = document.querySelectorAll('.invalid');
+      for (var j = 0; j < invalids.length; j++) {
+        invalids[j].classList.remove('invalid');
+      }
+    });
+  </script>
 </body>
 </html>
