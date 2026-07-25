@@ -109,12 +109,14 @@
       <p>期待与有影响力的创作者一起合作</p>
     </header>
 
-    <div id="successNotice" class="notice" role="status">报名提交成功，我们会尽快与您联系！</div>
+    <div id="successNotice" class="notice" role="status"></div>
 
-    <!-- 隐藏 iframe，接收表单提交结果，避免页面跳转 -->
     <iframe name="submitTarget" style="display:none"></iframe>
 
-    <form id="recruitmentForm" novalidate action="https://lzycoder123.app.n8n.cloud/webhook-test/c5198163-87e5-49cb-bcb2-bb45b5287b23" method="POST" target="submitTarget">
+    <form id="recruitmentForm" novalidate
+          action="https://lzycoder123.app.n8n.cloud/webhook-test/c5198163-87e5-49cb-bcb2-bb45b5287b23"
+          method="POST" target="submitTarget">
+
       <div class="form-group">
         <label for="name">真实姓名<span class="required">*</span></label>
         <input id="name" name="name" type="text" required />
@@ -187,22 +189,16 @@
   </main>
 
   <script>
-    var WEBHOOK_URL = 'https://lzycoder123.app.n8n.cloud/webhook-test/c5198163-87e5-49cb-bcb2-bb45b5287b23';
     var form = document.getElementById('recruitmentForm');
-    var successNotice = document.getElementById('successNotice');
-    var phonePattern = /^1[3-9]\d{9}$/;
-    var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var notice = document.getElementById('successNotice');
+    var phoneRE = /^1[3-9]\d{9}$/;
+    var emailRE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    function showError(id, message, element) {
-      var errorEl = document.getElementById(id + 'Error');
-      if (errorEl) {
-        errorEl.textContent = message;
-        errorEl.classList.toggle('visible', message !== '');
-      }
-      if (element) {
-        element.classList.toggle('invalid', message !== '');
-      }
-      return message === '';
+    function showError(id, msg, el) {
+      var e = document.getElementById(id + 'Error');
+      if (e) { e.textContent = msg; e.classList.toggle('visible', !!msg); }
+      if (el) el.classList.toggle('invalid', !!msg);
+      return !msg;
     }
 
     function validateText(id, label) {
@@ -211,84 +207,62 @@
     }
 
     function validateForm() {
-      var phone = document.getElementById('phone');
-      var email = document.getElementById('email');
-      var contentChecked = document.querySelectorAll('input[name="content"]:checked').length > 0;
-      var cooperationChecked = document.querySelector('input[name="cooperation"]:checked');
-
-      var checks = [
+      var ph = document.getElementById('phone');
+      var em = document.getElementById('email');
+      var ct = document.querySelectorAll('input[name="content"]:checked').length > 0;
+      var cp = document.querySelector('input[name="cooperation"]:checked');
+      return [
         validateText('name', '真实姓名'),
-        showError('phone', !phone.value.trim() ? '请填写手机号码' : phonePattern.test(phone.value.trim()) ? '' : '请输入正确的中国大陆手机号', phone),
-        showError('email', !email.value.trim() ? '请填写电子邮箱' : emailPattern.test(email.value.trim()) ? '' : '请输入正确的邮箱格式', email),
+        showError('phone', !ph.value.trim() ? '请填写手机号码' : phoneRE.test(ph.value.trim()) ? '' : '请输入正确的中国大陆手机号', ph),
+        showError('email', !em.value.trim() ? '请填写电子邮箱' : emailRE.test(em.value.trim()) ? '' : '请输入正确的邮箱格式', em),
         validateText('platform', '主要平台'),
         validateText('account', '账号名称'),
         validateText('followers', '粉丝数量级'),
-        showError('content', contentChecked ? '' : '请至少选择一个内容领域'),
-        showError('cooperation', cooperationChecked ? '' : '请选择合作意向'),
+        showError('content', ct ? '' : '请至少选择一个内容领域'),
+        showError('cooperation', cp ? '' : '请选择合作意向'),
         validateText('introduction', '自我介绍/合作经验')
-      ];
-
-      return checks.every(function(v) { return v; });
+      ].every(function(v) { return v; });
     }
 
     form.addEventListener('submit', function(event) {
-      successNotice.classList.remove('visible', 'error');
-
-      // 校验失败才拦截提交
+      notice.classList.remove('visible', 'error');
       if (!validateForm()) {
         event.preventDefault();
-        return;
       }
-
-      // 校验通过，放行！表单会自动 POST 到 n8n
-      // 延迟显示成功并重置
-      setTimeout(function() {
-        successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
-        successNotice.classList.add('visible');
-        form.reset();
-        setTimeout(function() {
-          successNotice.classList.remove('visible');
-        }, 3000);
-      }, 500);
+      // 校验通过 → 不拦截，浏览器原生提交（和 test-naked 完全一样）
     });
 
-    // 输入/修改时清除错误
-    function clearError(el) {
-      var err = document.getElementById(el.id + 'Error');
+    // 输入时清除错误提示
+    form.addEventListener('input', function(e) {
+      if (!e.target.matches('input, textarea, select')) return;
+      var err = document.getElementById(e.target.id + 'Error');
       if (err) err.classList.remove('visible');
-      el.classList.remove('invalid');
-    }
-
-    form.addEventListener('input', function(event) {
-      if (event.target.matches('input, textarea, select')) {
-        clearError(event.target);
-      }
+      e.target.classList.remove('invalid');
+    });
+    form.addEventListener('change', function(e) {
+      if (!e.target.matches('input, textarea, select')) return;
+      var err = document.getElementById(e.target.id + 'Error');
+      if (err) err.classList.remove('visible');
+      e.target.classList.remove('invalid');
+      if (e.target.name === 'content') { var ce = document.getElementById('contentError'); if (ce) ce.classList.remove('visible'); }
+      if (e.target.name === 'cooperation') { var ce = document.getElementById('cooperationError'); if (ce) ce.classList.remove('visible'); }
     });
 
-    form.addEventListener('change', function(event) {
-      if (event.target.matches('input, textarea, select')) {
-        clearError(event.target);
-      }
-      if (event.target.name === 'content') {
-        var err = document.getElementById('contentError');
-        if (err) err.classList.remove('visible');
-      }
-      if (event.target.name === 'cooperation') {
-        var err = document.getElementById('cooperationError');
-        if (err) err.classList.remove('visible');
-      }
-    });
-
+    // 重置按钮
     form.addEventListener('reset', function() {
-      successNotice.classList.remove('visible', 'error');
-      var errors = document.querySelectorAll('.error-message');
-      for (var i = 0; i < errors.length; i++) {
-        errors[i].classList.remove('visible');
-      }
-      var invalids = document.querySelectorAll('.invalid');
-      for (var j = 0; j < invalids.length; j++) {
-        invalids[j].classList.remove('invalid');
-      }
+      notice.classList.remove('visible', 'error');
+      [].forEach.call(document.querySelectorAll('.error-message'), function(e) { e.classList.remove('visible'); });
+      [].forEach.call(document.querySelectorAll('.invalid'), function(e) { e.classList.remove('invalid'); });
+    });
+
+    // iframe 加载完成 = 提交成功
+    var iframe = document.getElementsByName('submitTarget')[0];
+    iframe.addEventListener('load', function() {
+      notice.textContent = '报名提交成功，我们会尽快与您联系！';
+      notice.classList.add('visible');
+      notice.classList.remove('error');
+      form.reset();
+      setTimeout(function() { notice.classList.remove('visible'); }, 3000);
     });
   </script>
 </body>
