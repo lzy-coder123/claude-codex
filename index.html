@@ -253,30 +253,10 @@
       };
     }
 
-    // 用隐藏 iframe 提交表单，绕过浏览器 CORS 限制
-    const iframe = document.createElement('iframe');
-    iframe.name = 'hiddenFrame';
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    function buildFormFields(data, prefix) {
-      prefix = prefix || '';
-      let html = '';
-      for (const key in data) {
-        const name = prefix ? prefix + '[' + key + ']' : key;
-        const val = data[key];
-        if (Array.isArray(val)) {
-          val.forEach(function(v) {
-            html += '<input name="' + name + '[]" value="' + v.replace(/"/g, '&quot;') + '">';
-          });
-        } else if (val && typeof val === 'object') {
-          html += buildFormFields(val, name);
-        } else {
-          html += '<input name="' + name + '" value="' + String(val).replace(/"/g, '&quot;') + '">';
-        }
-      }
-      return html;
-    }
+    // 隐藏 iframe + 临时表单，绕过 CORS
+    document.body.insertAdjacentHTML('beforeend',
+      '<iframe name="n8nFrame" style="display:none"></iframe>'
+    );
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -284,17 +264,34 @@
       if (!validateForm()) return;
 
       const data = collectFormData();
-      const fieldsHtml = buildFormFields(data);
 
-      const iframeDoc = window.frames['hiddenFrame'].document;
-      iframeDoc.open();
-      iframeDoc.write('<!DOCTYPE html><html><body>'
-        + '<form id="n8nForm" action="' + WEBHOOK_URL + '" method="POST">'
-        + fieldsHtml
-        + '</form>'
-        + '<scr' + 'ipt>document.getElementById("n8nForm").submit()</scr' + 'ipt>'
-        + '</body></html>');
-      iframeDoc.close();
+      // 构建临时表单，target 到隐藏 iframe
+      let tempForm = document.createElement('form');
+      tempForm.action = WEBHOOK_URL;
+      tempForm.method = 'POST';
+      tempForm.target = 'n8nFrame';
+      tempForm.style.display = 'none';
+
+      for (const key in data) {
+        const val = data[key];
+        if (Array.isArray(val)) {
+          val.forEach(function(v) {
+            let input = document.createElement('input');
+            input.name = key + '[]';
+            input.value = v;
+            tempForm.appendChild(input);
+          });
+        } else {
+          let input = document.createElement('input');
+          input.name = key;
+          input.value = String(val);
+          tempForm.appendChild(input);
+        }
+      }
+
+      document.body.appendChild(tempForm);
+      tempForm.submit();
+      document.body.removeChild(tempForm);
 
       successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
       successNotice.classList.add('visible');
