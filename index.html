@@ -76,6 +76,7 @@
 
     .error-message { display: none; margin: 7px 0 0; color: var(--danger); font-size: 13px; }
     .error-message.visible { display: block; }
+    .notice.error { color: #b71c1c; background: #fdecea; }
     .notice {
       display: none;
       margin: 0 0 21px;
@@ -232,13 +233,53 @@
       return checks.every(Boolean);
     }
 
-    form.addEventListener('submit', (event) => {
+    const WEBHOOK_URL = 'https://lzycoder123.app.n8n.cloud/webhook-test/c5198163-87e5-49cb-bcb2-bb45b5287b23';
+
+    function collectFormData() {
+      const content = Array.from(document.querySelectorAll('input[name="content"]:checked'))
+        .map(cb => cb.value);
+      const cooperation = document.querySelector('input[name="cooperation"]:checked')?.value || '';
+      return {
+        name: document.getElementById('name').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        platform: document.getElementById('platform').value,
+        account: document.getElementById('account').value.trim(),
+        followers: document.getElementById('followers').value,
+        content: content,
+        cooperation: cooperation,
+        introduction: document.getElementById('introduction').value.trim(),
+        submittedAt: new Date().toISOString()
+      };
+    }
+
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
       successNotice.classList.remove('visible');
+      successNotice.classList.remove('error');
       if (!validateForm()) return;
-      successNotice.classList.add('visible');
-      clearTimeout(successTimer);
-      successTimer = setTimeout(() => successNotice.classList.remove('visible'), 3000);
+
+      try {
+        const data = collectFormData();
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
+        successNotice.classList.remove('error');
+        successNotice.classList.add('visible');
+        form.reset();
+        clearTimeout(successTimer);
+        successTimer = setTimeout(() => successNotice.classList.remove('visible'), 3000);
+      } catch (err) {
+        console.error('提交失败:', err);
+        successNotice.textContent = '提交失败，请稍后重试';
+        successNotice.classList.add('error', 'visible');
+        clearTimeout(successTimer);
+        successTimer = setTimeout(() => successNotice.classList.remove('visible', 'error'), 5000);
+      }
     });
 
     // 输入时只清除当前字段的错误（不在打字时对全表单报错）
