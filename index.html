@@ -243,22 +243,24 @@
       }
 
       // 把表单发到 n8n（target 指向隐藏 iframe，页面不跳转）
-      form.action = WEBHOOK_URL;
-      form.target = 'submitTarget';
+      form.setAttribute('action', WEBHOOK_URL);
+      form.setAttribute('target', 'submitTarget');
       form.submit();
 
-      // 显示成功
-      successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
-      successNotice.classList.add('visible');
-      form.reset();
-
-      // 重置 action/target，方便下次提交
-      form.action = '';
-      form.target = '';
-
+      // 延迟重置，确保数据先发出
       setTimeout(function() {
-        successNotice.classList.remove('visible');
-      }, 3000);
+        // 恢复原状
+        form.removeAttribute('action');
+        form.removeAttribute('target');
+        form.reset();
+
+        successNotice.textContent = '报名提交成功，我们会尽快与您联系！';
+        successNotice.classList.add('visible');
+
+        setTimeout(function() {
+          successNotice.classList.remove('visible');
+        }, 3000);
+      }, 500);
     });
 
     // 输入/修改时清除错误
