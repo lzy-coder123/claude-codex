@@ -229,17 +229,23 @@
       notice.classList.remove('visible', 'error');
       if (!validateForm()) return;
 
-      // 用 fetch 发数据（加 ngrok 头以绕过警告页）
-      var fd = new FormData(form);
-      var params = new URLSearchParams(fd).toString();
-      fetch(form.action, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'ngrok-skip-browser-warning': '1'
-        },
-        body: params
-      });
+      // 收集表单数据
+      var parts = [];
+      var els = form.querySelectorAll('input, select, textarea');
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (!el.name) continue;
+        if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) continue;
+        parts.push(encodeURIComponent(el.name) + '=' + encodeURIComponent(el.value));
+      }
+      var body = parts.join('&');
+
+      // 用 XHR 发 POST，加 ngrok 头
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', form.action);
+      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      xhr.setRequestHeader('ngrok-skip-browser-warning', '1');
+      xhr.send(body);
 
       // 立刻显示成功
       notice.textContent = '报名提交成功，我们会尽快与您联系！';
