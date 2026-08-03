@@ -4,27 +4,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-Claude Code 与 OpenAI Codex 协作工作区。Claude Code 负责架构设计、代码审查、需求沟通；Codex CLI 负责具体代码生成和执行。
+Claude Code 与 OpenAI Codex 协作工作区。包含 KOL 招募表单、n8n 自动化工作流、飞书多维表格集成。
 
-## 协作模式
+## 当前技术栈
 
-- **Claude Code 角色**: 设计方案、审查代码、修复问题、与用户沟通
-- **Codex CLI 角色**: 通过 `codex exec` 执行具体生成任务
-- Codex 位于 `$HOME/AppData/Local/OpenAI/Codex/bin/e2d6a5ee2cac801c/codex.exe`
-- 调用 Codex 时注意: 在非 git 仓库中需加 `--skip-git-repo-check`，如需保存会话记录不要加 `--ephemeral`
+- **前端**: 单文件 HTML 表单，GitHub Pages 部署
+- **自动化**: n8n（本地 Docker 部署），Webhook 触发
+- **数据存储**: 飞书多维表格（API 写入）
+- **邮件**: QQ 邮箱 SMTP 自动回复
+- **容器**: Docker Desktop + WSL 2
 
-## Codex 常用命令
+## n8n 工作流
+
+```
+Webhook → Code(修数组) → HTTP(Token飞书) → Code1(拼数据) → HTTP(写飞书) → Email(回复)
+```
+
+- 本地 n8n: `http://localhost:5678`
+- 生产 Webhook: `http://localhost:5678/webhook/1c7325d4-61c3-4cc1-a311-67d6d40cb2e3`
+- 工作流已发布，永久在线
+
+## Docker 命令
 
 ```bash
-# 设置 PATH
+docker start n8n     # 启动 n8n
+docker stop n8n      # 停止 n8n
+docker ps            # 查看状态
+docker logs n8n      # 查看日志
+```
+
+容器启动参数：`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `FEISHU_APP_ID`, `FEISHU_APP_SECRET`
+
+## Git 注意
+
+- `kol-recruitment-form.html` 在 .gitignore 中（含本地 webhook URL，不上传）
+- .gitignore 已配置：node_modules, .env, auth.json, 临时文件等
+
+## 相关文件
+
+- `QUICKSTART.md` — 快速启动指南
+- `KNOWLEDGE.md` — 完整知识梳理
+- `README.md` — 项目说明
+- `kol-recruitment-form.html` — 本地表单（不上传 GitHub）
+
+## Codex 调用
+
+```bash
 export PATH="$HOME/AppData/Local/OpenAI/Codex/bin/e2d6a5ee2cac801c:$PATH"
-
-# 非交互式执行（不保存会话）
 codex exec -C <工作目录> -s workspace-write --skip-git-repo-check --ephemeral "<任务描述>"
-
-# 非交互式执行（保存会话，Desktop 可见）
-codex exec -C <工作目录> -s workspace-write --skip-git-repo-check "<任务描述>"
-
-# 代码审查
-codex review
 ```
