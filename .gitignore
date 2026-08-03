@@ -1,0 +1,21 @@
+# 密钥和密码
+auth.json
+.env
+*.secret
+*_secret*
+
+# Node 依赖（太大，别人 npm install 自己装）
+node_modules/
+
+# 系统和编辑器
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# 临时文件
+*.tmp
+*.log
+*.temp
