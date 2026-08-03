@@ -246,12 +246,130 @@ wsl --update          # 更新 WSL 内核
 
 ---
 
-## 七、关键概念速记
+## 八、内网穿透
+
+### 为什么需要
+
+n8n 跑在本地 Docker 里（`localhost:5678`），只有你的电脑能访问。想让公网（GitHub Pages、手机）能 POST 到你的 webhook，需要把 localhost 暴露出去。
+
+### 原理
+
+```
+公网请求 → 隧道服务器 → 加密隧道 → 你电脑上的隧道客户端 → localhost:5678
+```
+
+隧道服务器在公网上，你的电脑主动连接它，建立一条加密通道。公网请求打到服务器上，通过隧道转发到你的电脑。
+
+### 方案对比
+
+| | Cloudflare Tunnel | ngrok 免费版 |
+|------|------|------|
+| 域名 | 每次重启随机变 | 固定域名，不变 |
+| 浏览器请求 | 直接转发 | 免费版会插警告页 |
+| 稳定性 | 好 | 好 |
+| 适用 | 临时测试 | 长期使用 |
+
+### ngrok 固定域名
+
+免费账号可申请 1 个固定域名。Docker 启动方式：
+
+```bash
+docker run -d --name ngrok --restart=always --net host \
+  ngrok/ngrok http 5678 \
+  --url=你的固定域名.ngrok-free.dev \
+  --authtoken=你的Token
+```
+
+### ngrok 警告页绕过
+
+ngrok 免费版在浏览器请求时会先返回警告页，POST 数据丢失。
+
+**解决**：不用原生 HTML 表单提交，改用 JavaScript XHR 发请求，加请求头 `ngrok-skip-browser-warning: 1`。
+
+```javascript
+var xhr = new XMLHttpRequest();
+xhr.open('POST', webhookUrl);
+xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+xhr.setRequestHeader('ngrok-skip-browser-warning', '1');  // 关键
+xhr.send(body);
+```
+
+⚠️ 加自定义头会触发 CORS 预检（OPTIONS 请求），需要隧道服务支持 CORS。ngrok 免费版支持。
+
+---
+
+## 九、JavaScript 表单提交方式演进
+
+本项目经历了三种表单提交方式：
+
+| 阶段 | 方式 | 为什么换 |
+|------|------|------|
+| 1 | fetch API + JSON | CORS 跨域被浏览器拦截 |
+| 2 | 原生 `<form>` + iframe | ngrok 警告页拦截 |
+| 3 | XHR + 手动拼参数 + ngrok 头 | ✅ 最终方案 |
+
+### 最终方案关键点
+
+**不用 FormData，手动拼参数**：
+
+```javascript
+// FormData + URLSearchParams 在移动端 select/radio 取值可能不准
+// 手动遍历更稳定
+var parts = [];
+var els = form.querySelectorAll('input, select, textarea');
+for (var i = 0; i < els.length; i++) {
+  var el = els[i];
+  if (!el.name) continue;                                    // 没 name 跳过
+  if (el.type === 'checkbox' && !el.checked) continue;       // 没勾跳过
+  if (el.type === 'radio' && !el.checked) continue;          // 没选跳过
+  parts.push(encodeURIComponent(el.name) + '=' + encodeURIComponent(el.value));
+}
+var body = parts.join('&');
+```
+
+**不用 fetch，用 XHR**：
+
+两者都能发请求，XHR 在旧移动浏览器兼容性更好，且行为更可控。
+
+---
+
+## 十、GitHub Actions CI/CD 排错
+
+### YAML 语法敏感
+
+YAML 对缩进和空格极其敏感：
+
+```yaml
+steps:
+  - uses: xxx    # ✅ steps 缩进2空格，- 缩进再2空格，uses 和 - 之间1空格
+  - uses:xxx     # ❌ 缺空格
+   - uses: xxx    # ❌ 缩进多了
+```
+
+### GitHub Push Protection
+
+GitHub 会扫描提交历史中的密钥（API Key、Token、Secret）。一旦检测到，拒绝 push。
+
+**解决**：
+1. 替换敏感值为占位符
+2. 用 `git reset --soft HEAD~N` 回滚，重新提交干净版本
+3. 或用 `git rebase -i` 清理历史
+
+```bash
+git reset --soft HEAD~2    # 撤销最近2个 commit，改动保留
+# 修改文件，去除密钥
+git add .
+git commit -m "干净版本"
+git push origin main
+```
 
 | 概念 | 一句话解释 |
 |------|------|
 | **Webhook** | 一个 URL，收到 POST 请求就触发工作流 |
 | **CORS** | 浏览器不让不同域名之间发 AJAX 请求 |
+| **CORS 预检** | 加自定义头时浏览器先发 OPTIONS 问"能发吗" |
+| **内网穿透** | 把 localhost 变成公网 URL |
+| **Tunnel** | 加密隧道，公网请求走隧道转发到本地 |
 | **API** | 程序的对外接口，发 HTTP 请求就能用 |
 | **Token** | 临时通行证，代替密码，过期要重拿 |
 | **SMTP** | 发邮件的标准协议 |
