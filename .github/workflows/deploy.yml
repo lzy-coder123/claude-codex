@@ -1,0 +1,18 @@
+name: 自动部署到 Github Pages
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+        - uses: actions/checkout@v4 # 拉取代码
+        - name: 部署到 gh-pages
+          uses:peaceiris/actions-gh-pages@v4 # 用别人写好的部署工具
+          with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            publish_dir: . # 把当前目录整个部署
+            publish_branch: gh-pages # 部署到 gh-pages 分支
