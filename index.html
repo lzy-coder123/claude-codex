@@ -230,13 +230,13 @@
         event.preventDefault();
         return;
       }
-      // 校验通过 → 即时显示成功，后台发数据
-      event.preventDefault();
-      form.submit();  // 后台发走，页面不动
+      // 校验通过 → 不拦截，原生提交，立刻显示成功
       notice.textContent = '报名提交成功，我们会尽快与您联系！';
       notice.classList.add('visible');
-      form.reset();
-      setTimeout(function() { notice.classList.remove('visible'); }, 4000);
+      setTimeout(function() {
+        form.reset();
+        setTimeout(function() { notice.classList.remove('visible'); }, 3000);
+      }, 300);
     });
 
     // 输入时清除错误提示
