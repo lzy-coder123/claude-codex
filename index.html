@@ -225,18 +225,27 @@
     }
 
     form.addEventListener('submit', function(event) {
+      event.preventDefault();
       notice.classList.remove('visible', 'error');
-      if (!validateForm()) {
-        event.preventDefault();
-        return;
-      }
-      // 校验通过 → 不拦截，原生提交，立刻显示成功
+      if (!validateForm()) return;
+
+      // 用 fetch 发数据（加 ngrok 头以绕过警告页）
+      var fd = new FormData(form);
+      var params = new URLSearchParams(fd).toString();
+      fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'ngrok-skip-browser-warning': '1'
+        },
+        body: params
+      });
+
+      // 立刻显示成功
       notice.textContent = '报名提交成功，我们会尽快与您联系！';
       notice.classList.add('visible');
-      setTimeout(function() {
-        form.reset();
-        setTimeout(function() { notice.classList.remove('visible'); }, 3000);
-      }, 300);
+      form.reset();
+      setTimeout(function() { notice.classList.remove('visible'); }, 3000);
     });
 
     // 输入时清除错误提示
@@ -260,16 +269,6 @@
       notice.classList.remove('visible', 'error');
       [].forEach.call(document.querySelectorAll('.error-message'), function(e) { e.classList.remove('visible'); });
       [].forEach.call(document.querySelectorAll('.invalid'), function(e) { e.classList.remove('invalid'); });
-    });
-
-    // iframe 加载完成 = 提交成功
-    var iframe = document.getElementsByName('submitTarget')[0];
-    iframe.addEventListener('load', function() {
-      notice.textContent = '报名提交成功，我们会尽快与您联系！';
-      notice.classList.add('visible');
-      notice.classList.remove('error');
-      form.reset();
-      setTimeout(function() { notice.classList.remove('visible'); }, 3000);
     });
   </script>
 </body>
