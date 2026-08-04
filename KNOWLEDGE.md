@@ -4,13 +4,14 @@
 
 ```
 报名者打开网页 → 填表提交 → n8n 收到数据 → 自动写飞书表格 + 发邮件
+运营人员打开看板 → GET 统计 Webhook → n8n 读取飞书 → 返回聚合数据 → 自动更新图表
 ```
 
 涉及的技术：
 
 | 层面 | 技术 | 作用 |
 |------|------|------|
-| 前端 | HTML + CSS + JS | 表单页面，给用户填的 |
+| 前端 | HTML + CSS + JS + Chart.js | 报名表单和运营数据看板 |
 | 部署 | GitHub Pages | 把 HTML 变成公网可访问的网址 |
 | 自动化 | n8n | 接收表单数据，串联后续动作 |
 | 数据存储 | 飞书多维表格 | 报名数据汇总管理 |
@@ -226,15 +227,9 @@ cd ~/Claude-codex
 git add -A
 git commit -m "说明"
 git push origin main
-# 同步到 GitHub Pages
-git checkout gh-pages
-git checkout main -- kol-recruitment-form.html
-cp kol-recruitment-form.html index.html
-git add -A
-git commit -m "同步"
-git push origin gh-pages
-git checkout main
 ```
+
+`.github/workflows/deploy.yml` 会在 `main` push 后自动发布到 `gh-pages`。不要手动修改 `gh-pages` 分支。
 
 ### WSL
 
@@ -362,6 +357,76 @@ git add .
 git commit -m "干净版本"
 git push origin main
 ```
+
+---
+
+## 十一、KOL 运营数据看板
+
+### 页面与接口
+
+看板文件为 `kol-dashboard.html`，本地地址：
+
+```text
+http://localhost:8080/kol-dashboard.html
+```
+
+页面请求 n8n 正式统计接口：
+
+```text
+GET http://localhost:5678/webhook/get-stats
+```
+
+正式 Webhook 要求工作流已保存并处于 Active 状态。`/webhook-test/get-stats` 只在点击 Execute workflow 后注册一次，不适合自动看板。
+
+看板打开时立即获取数据，并在页面可见时每 60 秒刷新。手动刷新按钮可随时重新请求。
+
+### 统计工作流
+
+```text
+Webhook GET /get-stats
+  -> HTTP Request（获取飞书 Token）
+  -> HTTP Request（读取飞书记录）
+  -> Code（聚合统计）
+  -> Respond to Webhook（返回 JSON）
+```
+
+Code 节点负责生成：
+
+| 字段 | 用途 |
+|------|------|
+| `totalSignups` | 总报名人数 |
+| `newLast3Days` | 近 3 天新增 |
+| `averageFollowers` | 按粉丝量级区间估算平均粉丝量 |
+| `coreInfluencerRatio` | 当前按 10 万以上计算核心达人占比 |
+| `domainStats` | 内容领域分布 |
+| `platformStats` | 主要平台分布 |
+| `followerStats` | 粉丝量级分布 |
+| `dailySignups` | 最近 7 天每日新增 |
+| `recentSignups` | 最近 5 条报名明细 |
+| `updatedAt` | 数据更新时间 |
+
+内容领域允许多选，因此 `domainStats` 的数量合计可能大于 `totalSignups`，这是正常现象。
+
+### CORS 与端口
+
+看板运行在 `localhost:8080`，n8n 运行在 `localhost:5678`，属于跨 Origin 请求。统计响应需要允许看板来源：
+
+```text
+Access-Control-Allow-Origin: http://localhost:8080
+```
+
+本地接口不需要 `ngrok-skip-browser-warning` 请求头。增加不必要的自定义头会触发 OPTIONS 预检。
+
+### 公网安全
+
+GitHub Pages 会发布 `kol-dashboard.html` 静态页面，但当前数据接口仍指向本机 `localhost`。由于统计响应包含姓名、账号和报名时间，不要直接把无鉴权接口替换成公网 URL。
+
+远程看板至少需要：
+
+1. HTTPS。
+2. 登录或短期 Token 鉴权。
+3. 严格的 CORS 来源白名单。
+4. 服务端过滤不需要公开的个人字段。
 
 | 概念 | 一句话解释 |
 |------|------|
