@@ -12,6 +12,10 @@ GitHub Pages 静态表单
   -> 本机 Docker 中的 n8n
   -> 飞书多维表格
   -> QQ 邮箱确认邮件
+
+本地运营看板
+  -> n8n GET /webhook/get-stats
+  -> 飞书聚合统计
 ```
 
 仓库只包含静态前端、GitHub Pages 部署配置和运维知识文档。n8n 工作流、飞书表格、邮箱配置、Docker 容器及其运行状态属于仓库外部系统，不要假定它们可由本仓库直接修改或验证。
@@ -19,6 +23,7 @@ GitHub Pages 静态表单
 ## 关键文件
 
 - `index.html`：生产表单和 GitHub Pages 入口，是已跟踪的前端事实源。
+- `kol-dashboard.html`：本地 KOL 运营看板，读取 n8n 正式统计 Webhook，并每 60 秒自动刷新。
 - `kol-recruitment-form.html`：本地表单副本，已被 `.gitignore` 忽略，可能包含与生产不同的 webhook。修改或覆盖前必须先比较内容。
 - `.github/workflows/deploy.yml`：`main` 分支 push 后部署到 `gh-pages`。
 - `QUICKSTART.md`：本机 Docker、隧道和部署操作指南。
@@ -32,6 +37,8 @@ GitHub Pages 静态表单
 - 保持中文界面、移动端可用性和现有表单字段语义。
 - 表单字段名是 n8n 的数据契约。修改 `name`、选项值或编码方式前，必须说明对 n8n 和飞书字段映射的影响。
 - 当前提交使用 `application/x-www-form-urlencoded`、`XMLHttpRequest` 和 `ngrok-skip-browser-warning` 请求头。调整提交方式时，要同时考虑 CORS 预检、ngrok 警告页和旧移动浏览器兼容性。
+- 看板统计接口使用 `GET /webhook/get-stats`。正式地址要求工作流已保存并处于 Active 状态；`/webhook-test/` 只用于单次调试。
+- 看板消费 `totalSignups`、`newLast3Days`、`averageFollowers`、`coreInfluencerRatio`、`domainStats`、`platformStats`、`followerStats`、`dailySignups`、`recentSignups` 和 `updatedAt`。修改接口或页面时保持双方一致。
 - 不要把“请求已发出”等同于“提交成功”。涉及提交反馈的修改应根据 HTTP 状态、超时和网络错误显示结果，并防止重复提交。
 - `index.html` 是生产版本。若任务也要求更新本地副本，先检查 `kol-recruitment-form.html` 的 webhook 和本地差异，只同步明确需要的部分。
 - 页面没有现成测试框架。不要为小改动擅自引入大型依赖；优先使用静态检查、浏览器手工验证和最小化脚本检查。
@@ -42,6 +49,7 @@ GitHub Pages 静态表单
 - `.env`、`auth.json`、`*.secret` 和 `*_secret*` 必须继续保持忽略。
 - webhook URL 属于运行配置。除非用户明确要求，不要更换、公开新增或猜测新的地址。
 - 不要在未获授权时调用生产 webhook、写入飞书表格或发送测试邮件；页面本地验证应避免产生真实报名数据。
+- `recentSignups` 包含姓名和账号。不得把无鉴权的统计接口改成公网地址；远程访问必须先加入身份验证、HTTPS 和 CORS 白名单。
 - 修改日志和文档示例时使用占位符，不要复制真实 Secret 或 Token。
 
 ## 文档一致性
@@ -76,4 +84,4 @@ docker ps
 docker logs n8n
 ```
 
-本地页面入口为 `http://localhost:8080/index.html`。除非用户明确要求，不要执行 `git push`、触发生产部署、启动或停止容器。
+本地报名页为 `http://localhost:8080/index.html`，本地看板为 `http://localhost:8080/kol-dashboard.html`。除非用户明确要求，不要执行 `git push`、触发生产部署、启动或停止容器。

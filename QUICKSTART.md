@@ -1,65 +1,115 @@
 # 快速启动指南
 
-## 开机后
+## 1. 启动本机服务
 
-Docker Desktop 设了开机自启，n8n 和 cloudflared 设了自动恢复。开机等 2 分钟就行。
+启动 Docker Desktop，等待 Docker 引擎可用，然后启动 n8n：
 
-如需手动：
-
-```bash
-docker start n8n cloudflared
+```powershell
+docker start n8n
 ```
 
-## 访问地址
+公网报名表依赖 ngrok 隧道。如果 ngrok 使用 Docker 且容器名为 `ngrok`：
+
+```powershell
+docker start ngrok
+docker logs ngrok
+```
+
+如果实际容器名不同，以 `docker ps -a` 的结果为准。
+
+## 2. 启动静态页面
+
+在仓库根目录执行：
+
+```powershell
+py -m http.server 8080
+```
+
+访问地址：
 
 | 用途 | 地址 |
 |------|------|
+| 本地报名页 | `http://localhost:8080/index.html` |
+| 本地数据看板 | `http://localhost:8080/kol-dashboard.html` |
 | n8n 编辑器 | `http://localhost:5678` |
-| 公网表单 | `https://lzy-coder123.github.io/claude-codex/` |
-| 本地表单 | `http://localhost:8080/kol-recruitment-form.html` |
+| 公网报名页 | `https://lzy-coder123.github.io/claude-codex/` |
 
-## 公网隧道
+## 3. 检查 n8n 工作流
 
-```bash
-docker logs cloudflared | grep trycloudflare  # 查看当前公网地址
+系统包含两条独立的数据链路。
+
+报名写入工作流：
+
+```text
+Webhook
+  -> Code（表单格式处理）
+  -> HTTP Request（飞书 Token）
+  -> Code（飞书字段映射）
+  -> HTTP Request（写入飞书）
+  -> Email（确认邮件）
 ```
 
-⚠️ 重启电脑后隧道 URL 会变，需要更新 `kol-recruitment-form.html` 中的 webhook 地址并重新部署。
+看板统计工作流：
 
-## 常用命令
-
-```bash
-docker ps                        # 看容器状态
-docker start n8n cloudflared     # 启动
-docker stop n8n cloudflared      # 停止
-docker logs n8n                  # n8n 日志
-docker logs cloudflared          # 隧道日志
+```text
+Webhook GET /get-stats
+  -> HTTP Request（飞书 Token）
+  -> HTTP Request（读取飞书记录）
+  -> Code（聚合看板数据）
+  -> Respond to Webhook（返回 JSON）
 ```
 
-## 部署到 GitHub Pages
+看板使用正式地址：
 
-```bash
-cd ~/Claude-codex
-cp kol-recruitment-form.html index.html
-git add index.html
-git commit -m "更新表单"
-git push origin main            # CI/CD 自动部署
+```text
+http://localhost:5678/webhook/get-stats
 ```
 
-## Webhook 地址
+统计工作流必须保存并切换为 Active，之后不需要点击 Execute workflow。页面打开时请求一次，并每 60 秒自动刷新。
 
-本地：`http://localhost:5678/webhook/1c7325d4-61c3-4cc1-a311-67d6d40cb2e3`
-公网：`https://<隧道域名>/webhook/1c7325d4-61c3-4cc1-a311-67d6d40cb2e3`
+## 4. CORS 设置
 
-## 环境变量
+本地看板运行在 8080，n8n 运行在 5678，属于不同 Origin。统计 Webhook 的响应应包含：
 
-- `FEISHU_APP_ID=cli_aaeeca52c1f85be4`
-- `FEISHU_APP_SECRET=<你的飞书App Secret>`
-- `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`
-- `N8N_TUNNEL=true`（可选，社区版可能不生效）
-
-## 工作流
-
+```text
+Access-Control-Allow-Origin: http://localhost:8080
 ```
-Webhook → Code → HTTP(Token) → Code1 → HTTP(写飞书) → Email
+
+若修改静态服务器端口，需要同步修改该响应头。
+
+## 5. 发布 GitHub Pages
+
+提交并推送 `main`：
+
+```powershell
+git add index.html kol-dashboard.html README.md QUICKSTART.md KNOWLEDGE.md CLAUDE.md AGENTS.md
+git commit -m "更新 KOL 运营看板"
+git push origin main
 ```
+
+`.github/workflows/deploy.yml` 会把仓库内容自动发布到 `gh-pages`。无需手动检出或提交 `gh-pages` 分支。
+
+## 6. 常见问题
+
+### Webhook 未注册
+
+- `/webhook-test/` 仅在点击 Execute workflow 后接收一次测试请求。
+- `/webhook/` 要求工作流已保存并处于 Active 状态。
+
+### 看板显示同步失败
+
+依次检查：
+
+1. Docker Desktop 和 n8n 是否运行。
+2. `get-stats` 工作流是否 Active。
+3. 浏览器网络请求是否返回 200 和 JSON。
+4. n8n 是否返回正确的 CORS 响应头。
+5. 飞书 Token、应用权限和表格授权是否有效。
+
+### 看板显示 `--`
+
+对应字段没有被统计接口返回，或所有飞书记录均为“未填写”。优先检查飞书原始字段名与 n8n Code 节点的映射。
+
+## 安全边界
+
+本地看板包含达人姓名、账号、平台和报名时间。不要直接把统计 Webhook 暴露到公网；若确需远程访问，应先增加登录或 Token 鉴权、HTTPS 和严格 CORS。

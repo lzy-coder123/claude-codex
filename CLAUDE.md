@@ -1,55 +1,78 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code 在本仓库中的补充说明。项目约束以 `AGENTS.md` 为准。
 
 ## 项目概述
 
-Claude Code 与 OpenAI Codex 协作工作区。包含 KOL 招募表单、n8n 自动化工作流、飞书多维表格集成。
+这是一个 KOL 招募与运营数据系统：
 
-## 当前技术栈
+```text
+GitHub Pages 报名页
+  -> n8n 报名工作流
+  -> 飞书多维表格 + 确认邮件
 
-- **前端**: 单文件 HTML 表单，GitHub Pages 部署
-- **自动化**: n8n（本地 Docker 部署），Webhook 触发
-- **数据存储**: 飞书多维表格（API 写入）
-- **邮件**: QQ 邮箱 SMTP 自动回复
-- **容器**: Docker Desktop + WSL 2
+本地运营看板
+  -> n8n 统计工作流
+  -> 飞书聚合数据
+```
+
+## 技术栈
+
+- 前端：单文件 HTML、CSS、JavaScript。
+- 图表：Chart.js CDN。
+- 自动化：本机 Docker 中的 n8n。
+- 数据存储：飞书多维表格。
+- 邮件：QQ 邮箱 SMTP。
+- 公网入口：GitHub Pages + ngrok。
+
+## 页面
+
+- `index.html`：GitHub Pages 首页和生产报名表。
+- `kol-dashboard.html`：本地运营看板，每 60 秒读取统计接口。
+- `kol-recruitment-form.html`：被 Git 忽略的本地报名页副本，覆盖前先比较 webhook 差异。
+
+本地启动：
+
+```powershell
+py -m http.server 8080
+```
 
 ## n8n 工作流
 
-```
-Webhook → Code(修数组) → HTTP(Token飞书) → Code1(拼数据) → HTTP(写飞书) → Email(回复)
-```
+报名写入：
 
-- 本地 n8n: `http://localhost:5678`
-- 生产 Webhook: `http://localhost:5678/webhook/1c7325d4-61c3-4cc1-a311-67d6d40cb2e3`
-- 工作流已发布，永久在线
-
-## Docker 命令
-
-```bash
-docker start n8n     # 启动 n8n
-docker stop n8n      # 停止 n8n
-docker ps            # 查看状态
-docker logs n8n      # 查看日志
+```text
+Webhook -> Code -> 飞书 Token -> 字段映射 -> 写飞书 -> Email
 ```
 
-容器启动参数：`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`, `FEISHU_APP_ID`, `FEISHU_APP_SECRET`
+看板统计：
 
-## Git 注意
-
-- `kol-recruitment-form.html` 在 .gitignore 中（含本地 webhook URL，不上传）
-- .gitignore 已配置：node_modules, .env, auth.json, 临时文件等
-
-## 相关文件
-
-- `QUICKSTART.md` — 快速启动指南
-- `KNOWLEDGE.md` — 完整知识梳理
-- `README.md` — 项目说明
-- `kol-recruitment-form.html` — 本地表单（不上传 GitHub）
-
-## Codex 调用
-
-```bash
-export PATH="$HOME/AppData/Local/OpenAI/Codex/bin/e2d6a5ee2cac801c:$PATH"
-codex exec -C <工作目录> -s workspace-write --skip-git-repo-check --ephemeral "<任务描述>"
+```text
+GET /webhook/get-stats -> 飞书 Token -> 读取记录 -> 聚合统计 -> JSON 响应
 ```
+
+统计接口需要返回：
+
+- `totalSignups`
+- `newLast3Days`
+- `averageFollowers`
+- `coreInfluencerRatio`
+- `domainStats`
+- `platformStats`
+- `followerStats`
+- `dailySignups`
+- `recentSignups`
+- `updatedAt`
+
+生产 Webhook 只有在工作流保存并处于 Active 状态时才会注册。测试地址 `/webhook-test/` 只接收点击 Execute workflow 后的一次请求。
+
+## Git 与部署
+
+- `main` 是源分支。
+- `.github/workflows/deploy.yml` 在 push 后自动发布到 `gh-pages`。
+- 不要手动修改 `gh-pages`，也不要把本地表单或凭据加入 Git。
+- 不执行 push、生产 Webhook 调用或容器启停，除非用户明确要求。
+
+## 安全边界
+
+看板会展示姓名、账号等报名信息。当前统计接口使用本机 `localhost`，不要直接替换为无鉴权的公网地址。远程看板需要先设计身份验证、HTTPS 和 CORS 白名单。

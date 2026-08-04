@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <title>KOL 运营数据追踪</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --ink: #142033;
+      --muted: #64748b;
+      --line: #dfe7f0;
+      --blue: #2563eb;
+      --cyan: #0891b2;
+      --green: #059669;
+      --orange: #ea580c;
+      --violet: #7c3aed;
+      --danger: #dc2626;
+      --shadow: 0 12px 30px rgba(30, 50, 80, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button { font: inherit; }
+
+    .topbar {
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .topbar-inner,
+    .dashboard {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .topbar-inner {
+      min-height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 1px solid #bcd0fa;
+      border-radius: 8px;
+      color: var(--blue);
+      background: #edf4ff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .brand-name { margin: 0; font-size: 16px; font-weight: 750; }
+    .brand-meta { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+
+    .topbar-actions { display: flex; align-items: center; gap: 12px; }
+
+    .sync-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+    }
+
+    .sync-state.loading .status-dot {
+      background: var(--orange);
+      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    .sync-state.error .status-dot {
+      background: var(--danger);
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+    }
+
+    .refresh-button {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--ink);
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+    }
+
+    .refresh-button:hover { border-color: #9eb7e3; color: var(--blue); background: #f8fbff; }
+    .refresh-button:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.2); outline-offset: 2px; }
+    .refresh-button:disabled { cursor: wait; opacity: 0.62; }
+    .refresh-icon { font-size: 17px; line-height: 1; }
+
+    .dashboard { padding: 34px 0 48px; }
+
+    .page-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .page-heading h1 { margin: 0; font-size: 25px; line-height: 1.25; font-weight: 780; }
+    .page-heading p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+
+    .mode-label {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--muted);
+      background: var(--surface);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      position: relative;
+      min-height: 146px;
+      overflow: hidden;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 5px 18px rgba(30, 50, 80, 0.045);
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 3px;
+      background: var(--accent);
+    }
+
+    .kpi-label { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .kpi-value {
+      min-height: 45px;
+      margin: 15px 0 9px;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 34px;
+      line-height: 1.15;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .kpi-value.text-value { font-size: 26px; line-height: 1.5; }
+    .kpi-note { margin: 0; color: var(--muted); font-size: 12px; }
+    .kpi-card:nth-child(1) { --accent: var(--blue); }
+    .kpi-card:nth-child(2) { --accent: var(--green); }
+    .kpi-card:nth-child(3) { --accent: var(--violet); }
+    .kpi-card:nth-child(4) { --accent: var(--orange); }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .chart-grid.equal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .chart-panel {
+      min-width: 0;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .chart-title { margin: 0; font-size: 16px; font-weight: 750; }
+    .chart-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+
+    .chart-badge {
+      flex: 0 0 auto;
+      padding: 5px 8px;
+      border-radius: 6px;
+      color: var(--cyan);
+      background: #ecfeff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .chart-wrap { position: relative; height: 310px; }
+    .chart-wrap canvas { width: 100% !important; height: 100% !important; }
+
+    .chart-empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      background: #fbfcfe;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .chart-empty.hidden { display: none; }
+
+    .table-panel {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .table-panel .chart-header {
+      margin: 0;
+      padding: 22px 22px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid #edf1f6;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      background: #f8fafc;
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fbfdff; }
+
+    .creator-name { font-weight: 700; }
+    .creator-account { margin-top: 3px; color: var(--muted); font-size: 12px; }
+
+    .platform-pill,
+    .domain-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .platform-pill { color: #1d4ed8; background: #eff6ff; }
+    .domain-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .domain-tag { color: #0f766e; background: #ecfdf5; }
+    .muted-cell { color: var(--muted); }
+    .empty-row { padding: 28px; color: var(--muted); text-align: center; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    @media (max-width: 900px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .chart-grid,
+      .chart-grid.equal { grid-template-columns: 1fr; }
+      .chart-wrap { height: 300px; }
+    }
+
+    @media (max-width: 620px) {
+      .topbar-inner,
+      .dashboard { width: min(100% - 28px, 1180px); }
+      .topbar-inner { min-height: 68px; }
+      .brand-meta, .sync-state span { display: none; }
+      .refresh-button { width: 40px; padding: 0; }
+      .button-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+      .dashboard { padding-top: 26px; }
+      .page-heading { align-items: flex-start; margin-bottom: 20px; }
+      .page-heading h1 { font-size: 22px; }
+      .mode-label { display: none; }
+      .kpi-grid { grid-template-columns: 1fr; gap: 12px; }
+      .kpi-card { min-height: 126px; padding: 18px; }
+      .kpi-value { min-height: 39px; margin: 12px 0 7px; font-size: 30px; }
+      .kpi-value.text-value { font-size: 24px; }
+      .chart-panel { padding: 18px; }
+      .chart-header { margin-bottom: 16px; }
+      .chart-wrap { height: 270px; }
+      .table-panel .chart-header { padding: 18px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">KO</div>
+        <div>
+          <p class="brand-name">KOL Ops</p>
+          <p class="brand-meta">Creator Intelligence Console</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div id="syncState" class="sync-state loading" role="status" aria-live="polite">
+          <i class="status-dot" aria-hidden="true"></i>
+          <span id="syncText">正在同步</span>
+        </div>
+        <button id="refreshButton" class="refresh-button" type="button" title="刷新数据" aria-label="刷新数据">
+          <span class="refresh-icon" aria-hidden="true">↻</span>
+          <span class="button-text">刷新数据</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="page-heading" aria-labelledby="dashboardTitle">
+      <div>
+        <h1 id="dashboardTitle">运营数据追踪</h1>
+        <p id="lastUpdated">等待接口响应</p>
+      </div>
+      <span id="modeLabel" class="mode-label">测试接口 · 手动刷新</span>
+    </section>
+
+    <section class="kpi-grid" aria-label="关键运营指标">
+      <article class="kpi-card">
+        <p class="kpi-label">总报名人数</p>
+        <p id="totalSignups" class="kpi-value">--</p>
+        <p class="kpi-note">飞书累计报名记录</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">近 3 天新增</p>
+        <p id="newLast3Days" class="kpi-value">--</p>
+        <p class="kpi-note">滚动统计新增报名</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">平均粉丝量</p>
+        <p id="averageFollowers" class="kpi-value">--</p>
+        <p class="kpi-note">按粉丝量级区间估算</p>
+      </article>
+      <article class="kpi-card">
+        <p class="kpi-label">核心达人占比</p>
+        <p id="coreInfluencerRatio" class="kpi-value">--</p>
+        <p class="kpi-note">当前按 10 万以上统计</p>
+      </article>
+    </section>
+
+    <section class="chart-grid" aria-label="报名趋势和平台分布">
+      <article class="chart-panel">
+        <header class="chart-header">
+          <div>
+            <h2 class="chart-title">近 7 天报名趋势</h2>
+            <p class="chart-subtitle">每日新增报名人数</p>
+          </div>
+          <span class="chart-badge">TREND</span>
+        </header>
+        <div class="chart-wrap">
+          <canvas id="dailyChart" role="img" aria-label="近 7 天 KOL 报名趋势折线图"></canvas>
+          <div id="dailyEmpty" class="chart-empty">等待报名趋势数据</div>
+        </div>
+      </article>
+
+      <article class="chart-panel">
+        <header class="chart-header">
+          <div>
+            <h2 class="chart-title">主要平台分布</h2>
+            <p class="chart-subtitle">达人首选社交平台</p>
+          </div>
+          <span class="chart-badge">CHANNEL</span>
+        </header>
+        <div class="chart-wrap">
+          <canvas id="platformChart" role="img" aria-label="KOL 主要平台分布环形图"></canvas>
+          <div id="platformEmpty" class="chart-empty">等待平台分布数据</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="chart-grid equal" aria-label="内容领域和粉丝量级分布">
+      <article class="chart-panel">
+        <header class="chart-header">
+          <div>
+            <h2 class="chart-title">内容领域分布</h2>
+            <p class="chart-subtitle">各领域达人数量</p>
+          </div>
+          <span class="chart-badge">DOMAIN</span>
+        </header>
+        <div class="chart-wrap">
+          <canvas id="domainChart" role="img" aria-label="KOL 内容领域分布柱状图"></canvas>
+          <div id="domainEmpty" class="chart-empty">等待内容领域数据</div>
+        </div>
+      </article>
+
+      <article class="chart-panel">
+        <header class="chart-header">
+          <div>
+            <h2 class="chart-title">粉丝量级分布</h2>
+            <p class="chart-subtitle">达人粉丝规模构成</p>
+          </div>
+          <span class="chart-badge">AUDIENCE</span>
+        </header>
+        <div class="chart-wrap">
+          <canvas id="followerChart" role="img" aria-label="KOL 粉丝量级分布柱状图"></canvas>
+          <div id="followerEmpty" class="chart-empty">等待粉丝量级数据</div>
+        </div>
+      </article>
+    </section>
+
+    <section class="table-panel" aria-labelledby="recentTitle">
+      <header class="chart-header">
+        <div>
+          <h2 id="recentTitle" class="chart-title">最近报名达人</h2>
+          <p class="chart-subtitle">最近 5 条报名记录</p>
+        </div>
+        <span class="chart-badge">LATEST</span>
+      </header>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>达人</th>
+              <th>主要平台</th>
+              <th>粉丝量级</th>
+              <th>内容领域</th>
+              <th>报名时间</th>
+            </tr>
+          </thead>
+          <tbody id="recentTableBody">
+            <tr><td class="empty-row" colspan="5">等待最近报名数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_URL = 'http://localhost:5678/webhook/get-stats';
+    const AUTO_REFRESH_MS = 60 * 1000;
+    const IS_TEST_WEBHOOK = API_URL.includes('/webhook-test/');
+    const CHART_COLORS = ['#2563eb', '#0891b2', '#7c3aed', '#059669', '#ea580c', '#db2777', '#475569', '#eab308'];
+
+    const numberFormatter = new Intl.NumberFormat('zh-CN');
+    const compactFormatter = new Intl.NumberFormat('zh-CN', {
+      notation: 'compact',
+      maximumFractionDigits: 1
+    });
+    const charts = {};
+
+    function setSyncState(type, message) {
+      const state = document.getElementById('syncState');
+      state.className = 'sync-state' + (type ? ' ' + type : '');
+      document.getElementById('syncText').textContent = message;
+    }
+
+    function objectEntries(value) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+      return Object.entries(value)
+        .map(function(entry) { return [entry[0], Number(entry[1]) || 0]; })
+        .filter(function(entry) { return entry[0] && entry[1] >= 0; })
+        .sort(function(a, b) { return b[1] - a[1]; });
+    }
+
+    function normalizeStats(payload) {
+      const root = Array.isArray(payload) ? payload[0] || {} : payload || {};
+      const source = root.data && !Array.isArray(root.data) ? root.data : root;
+      const followerEntries = objectEntries(source.followerStats);
+      const hasFollowerData = followerEntries.some(function(entry) {
+        return entry[0] !== '未填写' && entry[1] > 0;
+      });
+
+      let dailySignups = [];
+      if (Array.isArray(source.dailySignups)) {
+        dailySignups = source.dailySignups.map(function(item) {
+          return { date: String(item.date || ''), count: Number(item.count) || 0 };
+        }).filter(function(item) { return item.date; });
+      } else {
+        dailySignups = objectEntries(source.dailySignups).map(function(entry) {
+          return { date: entry[0], count: entry[1] };
+        });
+      }
+
+      return {
+        totalSignups: Number(source.totalSignups) || 0,
+        newLast3Days: Number(source.newLast3Days) || 0,
+        averageFollowers: Number(source.averageFollowers) || 0,
+        coreInfluencerRatio: Number(source.coreInfluencerRatio) || 0,
+        hasFollowerData: hasFollowerData,
+        domainEntries: objectEntries(source.domainStats),
+        platformEntries: objectEntries(source.platformStats),
+        followerEntries: followerEntries,
+        dailySignups: dailySignups,
+        recentSignups: Array.isArray(source.recentSignups) ? source.recentSignups.slice(0, 5) : [],
+        updatedAt: source.updatedAt || null
+      };
+    }
+
+    function updateCards(stats) {
+      document.getElementById('totalSignups').textContent = numberFormatter.format(stats.totalSignups);
+      document.getElementById('newLast3Days').textContent = '+' + numberFormatter.format(stats.newLast3Days);
+      document.getElementById('averageFollowers').textContent = stats.hasFollowerData
+        ? compactFormatter.format(Math.round(stats.averageFollowers))
+        : '--';
+      document.getElementById('coreInfluencerRatio').textContent = stats.hasFollowerData
+        ? stats.coreInfluencerRatio.toFixed(1) + '%'
+        : '--';
+    }
+
+    function baseChartOptions(showLegend) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        plugins: {
+          legend: {
+            display: showLegend,
+            position: 'bottom',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'circle',
+              boxWidth: 8,
+              boxHeight: 8,
+              padding: 18,
+              color: '#64748b',
+              font: { size: 12 }
+            }
+          },
+          tooltip: {
+            backgroundColor: '#142033',
+            padding: 11,
+            displayColors: false,
+            callbacks: {
+              label: function(context) { return ' ' + Number(context.raw).toLocaleString('zh-CN') + ' 人'; }
+            }
+          }
+        }
+      };
+    }
+
+    function prepareChart(name, emptyId, hasData) {
+      const empty = document.getElementById(emptyId);
+      empty.classList.toggle('hidden', hasData);
+
+      if (charts[name]) {
+        charts[name].destroy();
+        charts[name] = null;
+      }
+
+      if (hasData && typeof Chart === 'undefined') {
+        empty.textContent = '图表库加载失败，请检查网络';
+        empty.classList.remove('hidden');
+        return false;
+      }
+
+      return hasData;
+    }
+
+    function renderDailyChart(items) {
+      if (!prepareChart('daily', 'dailyEmpty', items.length > 0)) return;
+      const options = baseChartOptions(false);
+      options.interaction = { intersect: false, mode: 'index' };
+      options.scales = {
+        x: { grid: { display: false }, border: { display: false }, ticks: { color: '#64748b' } },
+        y: { beginAtZero: true, border: { display: false }, grid: { color: '#edf1f6' }, ticks: { color: '#64748b', precision: 0 } }
+      };
+
+      charts.daily = new Chart(document.getElementById('dailyChart'), {
+        type: 'line',
+        data: {
+          labels: items.map(function(item) { return item.date.slice(5); }),
+          datasets: [{
+            data: items.map(function(item) { return item.count; }),
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.10)',
+            borderWidth: 3,
+            pointRadius: 4,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#2563eb',
+            pointBorderWidth: 2,
+            tension: 0.35,
+            fill: true
+          }]
+        },
+        options: options
+      });
+    }
+
+    function renderDoughnutChart(entries) {
+      if (!prepareChart('platform', 'platformEmpty', entries.length > 0)) return;
+      const options = baseChartOptions(true);
+      options.cutout = '67%';
+
+      charts.platform = new Chart(document.getElementById('platformChart'), {
+        type: 'doughnut',
+        data: {
+          labels: entries.map(function(entry) { return entry[0]; }),
+          datasets: [{
+            data: entries.map(function(entry) { return entry[1]; }),
+            backgroundColor: entries.map(function(_, index) { return CHART_COLORS[index % CHART_COLORS.length]; }),
+            borderColor: '#ffffff',
+            borderWidth: 4,
+            hoverOffset: 5
+          }]
+        },
+        options: options
+      });
+    }
+
+    function renderBarChart(name, canvasId, emptyId, entries, horizontal) {
+      if (!prepareChart(name, emptyId, entries.length > 0)) return;
+      const options = baseChartOptions(false);
+      options.indexAxis = horizontal ? 'y' : 'x';
+      options.scales = horizontal ? {
+        x: { beginAtZero: true, border: { display: false }, grid: { color: '#edf1f6' }, ticks: { color: '#64748b', precision: 0 } },
+        y: { grid: { display: false }, border: { display: false }, ticks: { color: '#64748b' } }
+      } : {
+        x: { grid: { display: false }, border: { display: false }, ticks: { color: '#64748b' } },
+        y: { beginAtZero: true, border: { display: false }, grid: { color: '#edf1f6' }, ticks: { color: '#64748b', precision: 0 } }
+      };
+
+      charts[name] = new Chart(document.getElementById(canvasId), {
+        type: 'bar',
+        data: {
+          labels: entries.map(function(entry) { return entry[0]; }),
+          datasets: [{
+            data: entries.map(function(entry) { return entry[1]; }),
+            backgroundColor: entries.map(function(_, index) { return CHART_COLORS[index % CHART_COLORS.length]; }),
+            borderRadius: 5,
+            borderSkipped: false,
+            maxBarThickness: 48
+          }]
+        },
+        options: options
+      });
+    }
+
+    function createCell(row, className) {
+      const cell = document.createElement('td');
+      if (className) cell.className = className;
+      row.appendChild(cell);
+      return cell;
+    }
+
+    function formatDate(value) {
+      const date = new Date(value);
+      if (!value || Number.isNaN(date.getTime())) return '--';
+      return new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    }
+
+    function renderRecentSignups(items) {
+      const body = document.getElementById('recentTableBody');
+      body.replaceChildren();
+
+      if (!items.length) {
+        const row = document.createElement('tr');
+        const cell = createCell(row, 'empty-row');
+        cell.colSpan = 5;
+        cell.textContent = '等待最近报名数据';
+        body.appendChild(row);
+        return;
+      }
+
+      items.forEach(function(item) {
+        const row = document.createElement('tr');
+        const creatorCell = createCell(row);
+        const name = document.createElement('div');
+        name.className = 'creator-name';
+        name.textContent = item.name || '未命名';
+        creatorCell.appendChild(name);
+
+        if (item.account) {
+          const account = document.createElement('div');
+          account.className = 'creator-account';
+          account.textContent = item.account;
+          creatorCell.appendChild(account);
+        }
+
+        const platformCell = createCell(row);
+        const platform = document.createElement('span');
+        platform.className = 'platform-pill';
+        platform.textContent = item.platform || '未填写';
+        platformCell.appendChild(platform);
+
+        const followerCell = createCell(row, item.followerLevel && item.followerLevel !== '未填写' ? '' : 'muted-cell');
+        followerCell.textContent = item.followerLevel || '未填写';
+
+        const domainsCell = createCell(row);
+        const tags = document.createElement('div');
+        tags.className = 'domain-tags';
+        const domains = Array.isArray(item.domains) ? item.domains : [];
+        domains.slice(0, 3).forEach(function(value) {
+          const tag = document.createElement('span');
+          tag.className = 'domain-tag';
+          tag.textContent = value;
+          tags.appendChild(tag);
+        });
+        if (domains.length > 3) {
+          const more = document.createElement('span');
+          more.className = 'domain-tag';
+          more.textContent = '+' + (domains.length - 3);
+          tags.appendChild(more);
+        }
+        if (!domains.length) tags.textContent = '--';
+        domainsCell.appendChild(tags);
+
+        const dateCell = createCell(row, 'muted-cell');
+        dateCell.textContent = formatDate(item.createdAt);
+        body.appendChild(row);
+      });
+    }
+
+    function renderDashboard(payload) {
+      const stats = normalizeStats(payload);
+      updateCards(stats);
+      renderDailyChart(stats.dailySignups);
+      renderDoughnutChart(stats.platformEntries);
+      renderBarChart('domain', 'domainChart', 'domainEmpty', stats.domainEntries, true);
+      renderBarChart('follower', 'followerChart', 'followerEmpty', stats.followerEntries, false);
+      renderRecentSignups(stats.recentSignups);
+      document.getElementById('lastUpdated').textContent = '数据更新 ' + formatDate(stats.updatedAt || new Date());
+      setSyncState('', '数据已同步');
+    }
+
+    async function fetchData() {
+      const button = document.getElementById('refreshButton');
+      button.disabled = true;
+      setSyncState('loading', '正在同步');
+
+      try {
+        const response = await fetch(API_URL, { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        renderDashboard(await response.json());
+      } catch (error) {
+        console.error('加载看板数据失败:', error);
+        setSyncState('error', '同步失败');
+        document.getElementById('lastUpdated').textContent = IS_TEST_WEBHOOK
+          ? '请先在 n8n 点击 Execute workflow，再手动刷新'
+          : '接口暂时不可用，请稍后重试';
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    document.getElementById('refreshButton').addEventListener('click', fetchData);
+    document.getElementById('modeLabel').textContent = IS_TEST_WEBHOOK ? '测试接口 · 手动刷新' : '生产接口 · 60 秒刷新';
+    fetchData();
+
+    if (!IS_TEST_WEBHOOK) {
+      window.setInterval(function() {
+        if (!document.hidden) fetchData();
+      }, AUTO_REFRESH_MS);
+    }
+  </script>
+</body>
+</html>
